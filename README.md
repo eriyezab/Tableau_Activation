@@ -13,7 +13,7 @@
 
 3. Select the Warehouse, Database, and Schema that contains your Salesforce tables and then save the workbook. DO NOT CHANGE THE NAME OF THIS WORKBOOK!
 
-4. Open the command line("Command + Space" for Mac Users) and navigate to this directory.
+4. Open the command line("Command + Space" then type "terminal" for Mac Users) and navigate to this directory via the terminal.
 
 5. Run the command "python wkbk_conversion.py".
 
