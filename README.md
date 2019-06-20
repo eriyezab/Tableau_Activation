@@ -1,32 +1,11 @@
-////////////////////// Prerequisites //////////////////////
+////////////////////////////////////////////////////////////////// Prerequisites //////////////////////////////////////////////////////////////////
 
 1. Python 2 installed(already installed on Mac OSX)
 
     -If you are having trouble with this step, visit: https://www.python.org/downloads/
 
-2. BeautifulSoup4 installed
-
-    -Run this command in the command line:
-        sudo -H pip2 install beautifulsoup4
-
-    -If you are having trouble with this step, visit: https://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-beautiful-soup
-
-3. Soup Sieve installed
-
-    -Run this command in the command line:
-        sudo -H pip2 install soupsieve
-
-    -If you are having trouble with this step, visit: https://facelessuser.github.io/soupsieve/#__code_1
-
-3. "lxml" parser installed
-
-    -Run this command in the command line:
-        sudo -H pip2 install lxml
-
-    -If you are having trouble with this step, visit: https://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-a-parser
-
-    
-////////////////////// Tableau Workbook Setup //////////////////////
+  
+///////////////////////////////////////////////////////////// Tableau Workbook Setup /////////////////////////////////////////////////////////////
 
 1. Open the Tableau Workbook called "LogInToSnowFlake.twb".
 
@@ -36,7 +15,7 @@
 
 4. Open the command line("Command + Space" for Mac Users) and navigate to this directory.
 
-5. Run the command "python2 twb_conversion.py".
+5. Run the command "python wkbk_conversion.py".
 
 6. For each workbook in the "Workbooks" directory, open it and it will prompt you to log in to your Snowflake datasource.
 
