@@ -1,5 +1,6 @@
 import os
 import sys
+<<<<<<< HEAD
 import re
 import subprocess
 
@@ -21,11 +22,21 @@ install('lxml')
 from bs4 import BeautifulSoup
 
 def parse_freshbook(workbook):
+=======
+from bs4 import BeautifulSoup
+import re
+
+def parse_freshbook(workbook) -> tuple:
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
     """This function takes in a newly created tableau workbook that has been connected to the schema in snowflake that they would like the
     salesforce notebooks to be connected to.
     """
     items = []
 
+<<<<<<< HEAD
+=======
+    print(os.getcwd())
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
     with open(workbook, 'r') as wkbk:
         soup = BeautifulSoup(wkbk, "lxml-xml")
 
@@ -51,11 +62,19 @@ Warehouse, Database, and the Schema that contains your Salesforce information.')
     
 
  
+<<<<<<< HEAD
 def fivetran_shift(name):
     """Takes a name and returns it in a fivetran column format
     """
     # Replace international characters with similar ASCII characters
     name = name.strip()
+=======
+def fivetran_shift(name: str) -> str:
+    """Takes a name and returns it in a fivetran column format
+    """
+    # Replace international characters with similar ASCII characters
+    name = ascii(name.strip())
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
 
     # // The Han-Latin transliteration introduces a ' ' character after a '.' character
     name = name.replace(". ", ".")
@@ -66,7 +85,11 @@ def fivetran_shift(name):
     # split on capital letters
     name = "_".join(re.findall("[A-Z0-9][^A-Z0-9]*", name))
     # // Convert to lower_case and get rid of trailing apostrophe
+<<<<<<< HEAD
     name = name[:].lower()
+=======
+    name = name[:-1].lower()
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
 
     w = re.compile("[\\w_]")
 
@@ -78,7 +101,11 @@ def fivetran_shift(name):
 
 
 # TODO: Create the function that parses an xml or twb file and writes a new one that is connected to snowflake
+<<<<<<< HEAD
 def modify_xml(workbook):
+=======
+def modify_xml(workbook) -> None:
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
     """Take a Tableau workbook that is connected to a Fivetran Table and Salesforce
     and fixes the column names
     """
@@ -187,7 +214,11 @@ def modify_xml(workbook):
                 line = wkbk.readline()
 
         
+<<<<<<< HEAD
         with open(workbook, 'w') as f:
+=======
+        with open(workbook, 'w', newline='') as f:
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
             for item in statement:
                 f.write(item)
 
@@ -203,7 +234,14 @@ datasource = "    <datasource caption='" + main_schema + "' inline='true' name='
 
 if __name__ == "__main__":
     for wkbk in os.listdir('./Workbooks'):
+<<<<<<< HEAD
         if '.xml' in wkbk:
             os.chdir('./Workbooks')
             modify_xml(os.getcwd() + '/' + wkbk)
             print(wkbk.split('.')[0] + '.twb')
+=======
+        print(os.getcwd())
+        if wkbk != '.DS_Store':
+            os.chdir('./Workbooks')
+            modify_xml(os.getcwd() + '/' + wkbk)
+>>>>>>> 7a24d5670b98b1e72a350cc0e4799f7c8c87b701
