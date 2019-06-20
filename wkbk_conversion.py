@@ -26,7 +26,6 @@ def parse_freshbook(workbook):
     """
     items = []
 
-    print(os.getcwd())
     with open(workbook, 'r') as wkbk:
         soup = BeautifulSoup(wkbk, "lxml-xml")
 
@@ -204,7 +203,7 @@ datasource = "    <datasource caption='" + main_schema + "' inline='true' name='
 
 if __name__ == "__main__":
     for wkbk in os.listdir('./Workbooks'):
-        if wkbk != '.DS_Store':
+        if '.xml' in wkbk:
             os.chdir('./Workbooks')
             modify_xml(os.getcwd() + '/' + wkbk)
-            print(wkbk)
+            print(wkbk.split('.')[0] + '.twb')
