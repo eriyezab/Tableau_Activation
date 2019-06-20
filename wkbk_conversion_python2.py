@@ -14,7 +14,7 @@ def install(package):
         print('easy')
 
 # install beautifulsoup4, soupsieve and the xml parser
-install('beautifulsoup4')s
+install('beautifulsoup4')
 install('soupsieve')
 install('lxml')
 
