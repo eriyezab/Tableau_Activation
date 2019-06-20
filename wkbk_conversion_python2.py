@@ -1,7 +1,24 @@
 import os
 import sys
-from bs4 import BeautifulSoup
 import re
+import subprocess
+
+def install(package):
+    """Function enables the script to install beautifulsoup and the xml parser if it is not already installed on the users computer.
+    """
+    try:
+        subprocess.call([sys.executable, "-m", "pip", "install", "--user", package])
+        print('pip')
+    except:
+        subprocess.call([sys.executable, "-m", "easy_install", "--user", package])
+        print('easy')
+
+# install beautifulsoup4, soupsieve and the xml parser
+install('beautifulsoup4')s
+install('soupsieve')
+install('lxml')
+
+from bs4 import BeautifulSoup
 
 def parse_freshbook(workbook):
     """This function takes in a newly created tableau workbook that has been connected to the schema in snowflake that they would like the
