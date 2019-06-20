@@ -18,7 +18,6 @@ install('beautifulsoup4')
 install('soupsieve')
 install('lxml')
 
-
 from bs4 import BeautifulSoup
 
 def parse_freshbook(workbook):
@@ -125,12 +124,16 @@ def modify_xml(workbook):
                         table_index = line.index('table=\'[')
                         table_index += 8
                         table_name, rest = line[table_index:].split(']')
-                        table_name = main_schema + '].[' + fivetran_shift(table_name).upper() + ']'
+                        table = fivetran_shift(table_name).upper()
+                        table_name = main_schema + '].[' + table + ']'
                         line = ''.join([line[:table_index], table_name, rest])
                         connection_index = line.index('=\'') + 2
                         end_index = line.index('\' name')
                         line = line[:connection_index] + snowflake_connection + line[end_index:]
                         # print(line)
+                        if table not in ['USER', 'USER_ROLE', 'OPPORTUNITY_STAGE']:
+                            table_index = line.index('table=\'[')
+                            line = line[:table_index] + "type='text'>SELECT *&#10;FROM " + main_schema + "." + table + "&#10;WHERE NOT IS_DELETED</relation>"
                     else:
                         end_index = sf_index + end
                         line = line[:sf_index] + federated_connection + line[end_index:]
@@ -198,13 +201,16 @@ def modify_xml(workbook):
         
         os.chdir('../')
 
-new_workbook = './LogInToSnowflake.twb'
-federated_connection, snowflake_connection, main_schema, connection = parse_freshbook(new_workbook)
-datasource = "    <datasource caption='" + main_schema + "' inline='true' name='" + federated_connection + "' version='18.1'>\n"
 
 if __name__ == "__main__":
+    new_workbook = './LogInToSnowflake.twb'
+    federated_connection, snowflake_connection, main_schema, connection = parse_freshbook(new_workbook)
+    datasource = "    <datasource caption='" + main_schema + "' inline='true' name='" + federated_connection + "' version='18.1'>\n"
+
     for wkbk in os.listdir('./Workbooks'):
-        if '.xml' in wkbk:
+        if '.xml' in wkbk and '.twb' not in wkbk:
             os.chdir('./Workbooks')
             modify_xml(os.getcwd() + '/' + wkbk)
             print(wkbk.split('.')[0] + '.twb')
+        else:
+            print(wkbk, 'was already converted into a Tableau Workbook.')
