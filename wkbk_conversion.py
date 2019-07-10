@@ -14,18 +14,29 @@ def install(package):
         print('easy')
 
 # install beautifulsoup4, soupsieve and the xml parser
-install('beautifulsoup4')
-install('soupsieve')
-install('lxml')
+try:
+    # try to install bs4 and the parsers
+    install('beautifulsoup4')
+    install('soupsieve')
+    install('lxml')
+except:
+    # try again if there is an error
+    install('beautifulsoup4')
+    install('soupsieve')
+    install('lxml')
+finally:
+    # if it fails again then stop the program and ask the user to rerun the program. If it doesn't work again then there mgiht be permission issues
+    print('Please rerun the program.')
+    sys.exit()
 
 from bs4 import BeautifulSoup
 
 def parse_freshbook(workbook):
     """This function takes in a newly created tableau workbook that has been connected to the schema in snowflake that they would like the
-    salesforce notebooks to be connected to.
+    tableau workbooks to be connected to.
     """
-    items = []
 
+    # open the workbook and parse it with beautiful soup
     with open(workbook, 'r') as wkbk:
         soup = BeautifulSoup(wkbk, "lxml-xml")
 
@@ -44,8 +55,8 @@ def parse_freshbook(workbook):
     try:
         schema = soup.datasource.connection.connection['schema']
     except:
-        print('The tableau workbook is not connected to a snowflake schema. Please ensure that you have connected to a\
-Warehouse, Database, and the Schema that contains your Salesforce information.')
+        print('The tableau workbook is not connected to a snowflake schema. Please ensure that you have connected to the\
+Warehouse, Database, and the Schema that contains your Salesforce data.')
         sys.exit()
     return federated, snowflake, schema, connection
     
@@ -88,6 +99,7 @@ def modify_xml(workbook):
     with open(workbook, 'r') as fp:
         soup = BeautifulSoup(fp, "lxml-xml")
 
+    # end is the length of the salesforce link that is in the tabelau salesforce starters
     end = len(soup.find_all('datasource')[1]['name'])
     
     with open(workbook, 'r') as wkbk:
@@ -108,9 +120,11 @@ def modify_xml(workbook):
                 line = wkbk.readline()
                 line = wkbk.readline()
                 line = wkbk.readline()
+                # find every salesforce link in the document and replace them
             elif 'salesforce.' in line:
                 while 'salesforce.' in line:
                     sf_index = line.index('salesforce.')
+                    # if it is a login link then change it to refer to snowflake
                     if 'login.salesforce.com' in line:
                         sf_index -= 6
                         end_index = line.index('\' ')
@@ -175,7 +189,7 @@ def modify_xml(workbook):
                 statement.append(line)
                 line = wkbk.readline()
             # ensure that extract enabled is false so that the workbook is automatically in live mode once connected. If it is already in live mode then the exception should
-            # run because true will not be in the line.
+            # run because true will not be in the line. This should never be the case but just in case
             elif '<extract' in line:
                 try:
                     enabled_index = line.index('true')
@@ -190,15 +204,17 @@ def modify_xml(workbook):
                 statement.append(line)
                 line = wkbk.readline()
 
-        
+        # rewrtie the tableau workbook with the lines in the statement list
         with open(workbook, 'w') as f:
             for item in statement:
                 f.write(item)
 
+        # rename the tableau workbook so that the file extension is twb instead of xml
         new_name = os.path.basename(workbook).split('.')
         new_name = new_name[0] + '.twb'
         os.rename(workbook, new_name)
         
+        # go back to the main directory
         os.chdir('../')
 
 
