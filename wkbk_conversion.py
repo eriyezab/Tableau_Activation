@@ -24,10 +24,6 @@ except:
     install('beautifulsoup4')
     install('soupsieve')
     install('lxml')
-finally:
-    # if it fails again then stop the program and ask the user to rerun the program. If it doesn't work again then there mgiht be permission issues
-    print('Please rerun the program.')
-    sys.exit()
 
 from bs4 import BeautifulSoup
 
@@ -182,7 +178,7 @@ def modify_xml(workbook):
                 statement.append(''.join([map_part, value_part]))
                 line = wkbk.readline()
             # Problem with top accounts that needed to be changed. Add a ZEROIFNULL to expected amount so that null values dont break the workbook when in live mode.
-            elif ('calculation' in line or 'groupfilter' in line )and '[Expected Amount]' in line:
+            elif ('calculation' in line or 'groupfilter' in line ) and '[Expected Amount]' in line:
                 expected_amount_index = line.index('[Expected Amount]')
                 end_index = expected_amount_index + len('[Expected Amount]')
                 line = line[:expected_amount_index] + 'ZN([Expected Amount])' + line[end_index:]
@@ -228,5 +224,7 @@ if __name__ == "__main__":
             os.chdir('./Workbooks')
             modify_xml(os.getcwd() + '/' + wkbk)
             print(wkbk.split('.')[0] + '.twb')
+        elif '.DS_Store' in wkbk:
+            pass
         else:
             print(wkbk, 'was already converted into a Tableau Workbook.')
