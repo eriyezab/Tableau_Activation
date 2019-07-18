@@ -3,6 +3,12 @@ import sys
 import re
 import subprocess
 
+# Replaces a <old> with <new> <occurence> times starting from the right side of the string
+def rreplace(s, old, new, occurrence):
+    li = s.rsplit(old, occurrence)
+    return new.join(li)
+
+# installs <package> on the system
 def install(package):
     """Function enables the script to install beautifulsoup and the xml parser if it is not already installed on the users computer.
     """
@@ -39,6 +45,7 @@ def parse_freshbook(workbook):
     try:
         federated = soup.datasource['name']
         snowflake = soup.datasource.find('named-connection')['name']
+        caption = soup.datasource['caption']
         connection = soup.datasources.prettify()
         connection = connection.split('\n')
         for i in range(len(connection)):
@@ -54,7 +61,7 @@ def parse_freshbook(workbook):
         print('The tableau workbook is not connected to a snowflake schema. Please ensure that you have connected to the\
 Warehouse, Database, and the Schema that contains your Salesforce data.')
         sys.exit()
-    return federated, snowflake, schema, connection
+    return federated, snowflake, caption, schema, connection
     
 
  
@@ -70,8 +77,11 @@ def fivetran_shift(name):
     # // Replace all illegal characters
     name = pe.sub("_", name.strip())
 
-    # split on capital letters
-    name = "_".join(re.findall("[A-Z0-9][^A-Z0-9]*", name))
+    # split on capital letters and numbers
+    name = re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', re.sub('([0-9]+)', r' \1 ', name))).split()
+    
+    # join on underscore
+    name = '_'.join(name)
     # // Convert to lower_case and get rid of trailing apostrophe
     name = name[:].lower()
 
@@ -81,6 +91,8 @@ def fivetran_shift(name):
     if not name == '' and w.match(name) is None:
          name = "_" + name
 
+    # get rid of any double underscores if any
+    name = re.sub('([_]+)', '_', name)
     return name
 
 
@@ -96,57 +108,57 @@ def modify_xml(workbook):
         soup = BeautifulSoup(fp, "lxml-xml")
 
     # end is the length of the salesforce link that is in the tabelau salesforce starters
-    end = len(soup.find_all('datasource')[1]['name'])
+    try:
+        old_caption = soup.datasource['caption'].encode('ascii','ignore')
+        old_federated = soup.datasource['name'].encode('ascii','ignore')
+        old_snowflake = soup.datasource.find('named-connection')['name'].encode('ascii','ignore')
+    except:
+        
+        old_caption = soup.find_all('datasource')[1]['caption'].encode('ascii','ignore')
+        old_federated = soup.find_all('datasource')[1]['name'].encode('ascii','ignore')
+        old_snowflake = soup.find_all('datasource')[1].find('named-connection')['name'].encode('ascii','ignore')
+    
+    print(old_caption, old_federated, old_snowflake)
+    
     
     with open(workbook, 'r') as wkbk:
         
         line = wkbk.readline()
 
         while line:
+            if old_caption in line:
+                line = line.replace(old_caption, new_caption)
+            # replace the old_federated links with the new ones. It is possible that the old_snowflake link and the old_federated link are the same so only replace the federated 
+            # link when it is not a relation connection tag as those tags are where the snowflake links go.
+            if old_federated in line and "<relation connection='" not in line:
+                line = line.replace(old_federated, federated_connection)
             # STEPS
             # TODO: Change the datasource to the federated snowflake link
             # TODO: Change named-connection to the snowflake link
-            if "datasource caption=" in line and 'inline=' in line and 'salesforce' in line:                
-                statement.append(datasource)
-                line = wkbk.readline()
+            if "connection class=" in line:  
                 statement.append(connection)
                 line = wkbk.readline()
                 line = wkbk.readline()
                 line = wkbk.readline()
                 line = wkbk.readline()
                 line = wkbk.readline()
-                line = wkbk.readline()
-                # find every salesforce link in the document and replace them
-            elif 'salesforce.' in line:
-                while 'salesforce.' in line:
-                    sf_index = line.index('salesforce.')
-                    # if it is a login link then change it to refer to snowflake
-                    if 'login.salesforce.com' in line:
-                        sf_index -= 6
-                        end_index = line.index('\' ')
-                        line = line[:sf_index] + 'Snowflake (Salesforce)' + line[end_index:]
-                        sf_index = line.index("name='salesforce.") + 6
-                        end_index = sf_index + end
-                        line = line[:sf_index] + federated_connection + line[end_index:]
-                        
-                    # TODO: Change all relation connections to the snowflake link and the table names to snowflake tables
-                    elif "<relation connection='" in line:
-                        table_index = line.index('table=\'[')
-                        table_index += 8
-                        table_name, rest = line[table_index:].split(']')
-                        table = fivetran_shift(table_name).upper()
-                        table_name = main_schema + '].[' + table + ']'
-                        line = ''.join([line[:table_index], table_name, rest])
-                        connection_index = line.index('=\'') + 2
-                        end_index = line.index('\' name')
-                        line = line[:connection_index] + snowflake_connection + line[end_index:]
-                        # print(line)
-                        if table not in ['USER', 'USER_ROLE', 'OPPORTUNITY_STAGE']:
-                            table_index = line.index('table=\'[')
-                            line = line[:table_index] + "type='text'>SELECT *&#10;FROM " + main_schema + "." + table + "&#10;WHERE NOT IS_DELETED</relation>"
-                    else:
-                        end_index = sf_index + end
-                        line = line[:sf_index] + federated_connection + line[end_index:]
+                line = wkbk.readline()        
+            # TODO: Change all relation connections to the snowflake link and the table names to snowflake tables
+            elif "<relation connection='" in line:
+                if old_snowflake in line:
+                    line = line.replace(old_snowflake, snowflake_connection)
+                table_index = line.index('table=\'[')
+                table_index += 8
+                table_name, rest = line[table_index:].split(']')
+                table = fivetran_shift(table_name).upper()
+                line = rreplace(line, table_name, main_schema + '].[' + table, 1)
+                # print(line)
+                # These are the tables that do not have 'IsDeleted' fields in salesforce. We want all the fields that do have 'IsDeleted' to be a custom query that filters out the deleted fields
+                if table not in ['APEX_CLASS', 'CASE_STATUS', 'CASE_TEAM_MEMBER', 'CASE_TEAM_ROLE', 'CASE_TEAM_TEMPLATE', 'CASE_TEAM_TEMPLATE_MEMBER', 'CASE_TEAM_TEMPLATE_RECORD', \
+                    'EMAIL_TEMPLATE', 'GROUP', 'GROUP_MEMBER', 'LEAD_STATUS', 'LOGIN_HISTORY', 'OPPORTUNITY_STAGE', 'PARTNER_ROLE', 'PERIOD', 'RECORD_TYPE', 'TASK_PRIORITY', 'TASK_STATUS', \
+                        'TERRITORY_2', 'USER', 'USER_ROLE', 'USER_TERRITORY_2_ASSOCIATION']:
+                    table_index = line.index('table=\'[')
+                    line = line[:table_index] + "type='text'>SELECT *&#10;FROM " + main_schema + "." + table + "&#10;WHERE NOT IS_DELETED</relation>"                   
                 statement.append(line)
                 line = wkbk.readline()
 
@@ -155,11 +167,7 @@ def modify_xml(workbook):
                 front, back = line.split("'[")
                 table, back = back.split('].[')
                 column, back = back.split(']')
-                reference = table
-                column = fivetran_shift(column).upper()  
-                back = ']'.join([column, back])  
-                back = '].['.join([table, back])   
-                line = "'[".join([front, back]) 
+                line = rreplace(line, column, fivetran_shift(column).upper(), 1)  
                 statement.append(line)
                 line = wkbk.readline()
 
@@ -170,27 +178,20 @@ def modify_xml(workbook):
                 map_part, value_part = line[:value_index], line[value_index:]
                 table, value = value_part.split('].[')
                 column, rest = value.split(']')
-                reference = table
                 # print(table, column)
-                column = fivetran_shift(column).upper()
-                value = ']'.join([column, rest])
-                value_part = '].['.join([table, value])
-                statement.append(''.join([map_part, value_part]))
+                line = rreplace(line, column, fivetran_shift(column).upper(), 1)
+                statement.append(line)
                 line = wkbk.readline()
             # Problem with top accounts that needed to be changed. Add a ZEROIFNULL to expected amount so that null values dont break the workbook when in live mode.
             elif ('calculation' in line or 'groupfilter' in line ) and '[Expected Amount]' in line:
-                expected_amount_index = line.index('[Expected Amount]')
-                end_index = expected_amount_index + len('[Expected Amount]')
-                line = line[:expected_amount_index] + 'ZN([Expected Amount])' + line[end_index:]
+                line = line.replace('[Expected Amount]', 'ZN([Expected Amount])')
                 statement.append(line)
                 line = wkbk.readline()
             # ensure that extract enabled is false so that the workbook is automatically in live mode once connected. If it is already in live mode then the exception should
             # run because true will not be in the line. This should never be the case but just in case
             elif '<extract' in line:
                 try:
-                    enabled_index = line.index('true')
-                    end_index = enabled_index + len('true')
-                    line = line[:enabled_index] + 'false' + line[end_index:]
+                    line = line.replace('true', 'false')
                     statement.append(line)
                     line = wkbk.readline()
                 except ValueError:
@@ -200,15 +201,12 @@ def modify_xml(workbook):
                 statement.append(line)
                 line = wkbk.readline()
 
-        # rewrtie the tableau workbook with the lines in the statement list
-        with open(workbook, 'w') as f:
+        # rewrite the tableau workbook with the lines in the statement list
+        new_file = os.path.basename(workbook).split('.')
+        new_file = new_file[0] + '_tmp.twb'
+        with open(new_file, 'w') as f:
             for item in statement:
                 f.write(item)
-
-        # rename the tableau workbook so that the file extension is twb instead of xml
-        new_name = os.path.basename(workbook).split('.')
-        new_name = new_name[0] + '.twb'
-        os.rename(workbook, new_name)
         
         # go back to the main directory
         os.chdir('../')
@@ -216,15 +214,14 @@ def modify_xml(workbook):
 
 if __name__ == "__main__":
     new_workbook = './LogInToSnowflake.twb'
-    federated_connection, snowflake_connection, main_schema, connection = parse_freshbook(new_workbook)
-    datasource = "    <datasource caption='" + main_schema + "' inline='true' name='" + federated_connection + "' version='18.1'>\n"
+    federated_connection, snowflake_connection, new_caption, main_schema, connection = parse_freshbook(new_workbook)
+    # print(connection)
 
     for wkbk in os.listdir('./Workbooks'):
-        if '.xml' in wkbk and '.twb' not in wkbk:
+        if '.xml' in wkbk or '.twb'  in wkbk:
             os.chdir('./Workbooks')
+            print(wkbk)
             modify_xml(os.getcwd() + '/' + wkbk)
-            print(wkbk.split('.')[0] + '.twb')
-        elif '.DS_Store' in wkbk:
-            pass
+            print(wkbk.split('.')[0] + '.twb has been ported.')
         else:
-            print(wkbk, 'was already converted into a Tableau Workbook.')
+            print(wkbk, 'is not in a proper format. Please ensure that this is the correct file and if it is then ensure that the file extension is *.twb or *.xml')
