@@ -1,16 +1,49 @@
-import os
-import sys
-import re
-import subprocess
+import os # for navigating and creating directories
+import sys # for installing bs4, soupsieve, and the lxml parser and exiting the program on certain errors
+import re # for the column mapping algorithm(fivetran_shift)
+import subprocess # for installing bs4, soupsieve, and the lxml parser
 
-# Replaces a <old> with <new> <occurence> times starting from the right side of the string
+
 def rreplace(s, old, new, occurrence):
+    """
+    Replaces <old> with <new> <occurence> times starting from the right side of the string. 
+    This function is used primarily to replace salesforce column names with snowflake/fivetran column names
+    without replacing the alias(key) in Tableau. The aliases need to stay the same because the dashboards
+    and worksheets use them to refer to the columns as opposed to the column names themselves. Sometimes 
+    an alias will use the same name as the column name and in these cases we do not want to replace the alias.
+    Other times they use different names. The name we want to replace will always be the rightmost name.
+    Ex - Salesforce Workbook:
+               (alias)                       (column)
+    <map key='[Amount]' value='[Opportunity].[Amount]' />
+
+    We want to replace the column with the equivalent column name in snowflake, but we want the alias to stay the same.
+    After using rreplace() with the string and the snowflake column as <new>, the line in the ported workbook should look like the following.
+    Snowlfake Workbook:
+               (alias)                       (column)
+    <map key='[Amount]' value='[Opportunity].[AMOUNT]' />
+
+    Parameters:
+    s - str: string that contains the substring <old> that you want to replace.
+    old - str: the substring in <s> that you want to replace.
+    new - str: the substring that you want to replace <old>.
+    occurrence - int: the number of times you want to replace <old> with <new>, starting from the rightmost side of the string.
+
+    >>> s = "<map key='[Amount]' value='[Opportunity].[Amount]' />"
+    >>> old = 'Amount'
+    >>> new = 'AMOUNT'
+    >>> new_s = rreplace(s, old, new, 1)
+    >>> new_s
+    <map key='[Amount]' value='[Opportunity].[AMOUNT]' />
+    """
     li = s.rsplit(old, occurrence)
     return new.join(li)
 
-# installs <package> on the system
+# installs <package> on the system. We need this function because the assumption is that the user does not already have the p
 def install(package):
     """Function enables the script to install beautifulsoup and the xml parser if it is not already installed on the users computer.
+
+    Parameters:
+    package - str: The name of the package to be installed.
     """
     try:
         subprocess.call([sys.executable, "-m", "pip", "install", "--user", package])
@@ -35,13 +68,18 @@ from bs4 import BeautifulSoup
 
 def parse_freshbook(workbook):
     """This function takes in a newly created tableau workbook that has been connected to the schema in snowflake that they would like the
-    tableau workbooks to be connected to.
+    tableau workbooks to be connected to and returns the federated connection, snowflake connection, caption of the datasource, and the 
+    named-connection tag containing the database, warehouse and schema information. 
+
+    Parameters:
+    workbook - str: The name of the file to be ported.
     """
 
     # open the workbook and parse it with beautiful soup
     with open(workbook, 'r') as wkbk:
         soup = BeautifulSoup(wkbk, "lxml-xml")
 
+    # try to get the credentials from the first datasource tag
     try:
         federated = soup.datasource['name']
         snowflake = soup.datasource.find('named-connection')['name']
@@ -52,11 +90,15 @@ def parse_freshbook(workbook):
             connection[i] = '   ' + connection[i]
         connection[7] = connection[7] + '\n'
         connection = '\n'.join(connection[2:8])
+    # if the first datasource tag does not contain the credentials, then the user did not put the correct information in
+    # the LogInToSnowflake.twb file
     except:
         print('The tableau workbook is not connected to a snowflake datasource.')
         sys.exit()
+    # try and get the schema name from the datasource tag
     try:
         schema = soup.datasource.connection.connection['schema']
+    # if it is not there then the user did not connect to a schema
     except:
         print('The tableau workbook is not connected to a snowflake schema. Please ensure that you have connected to the\
 Warehouse, Database, and the Schema that contains your Salesforce data.')
@@ -66,7 +108,14 @@ Warehouse, Database, and the Schema that contains your Salesforce data.')
 
  
 def fivetran_shift(name):
-    """Takes a name and returns it in a fivetran column format
+    """Takes a name and returns it in a fivetran column format.
+
+    Parameters:
+    name - str: The salesforce column name that needs to be changed to a snowflake column name using fivetran conventions.
+
+    >>> s = 'KawhiIsMyMVP'
+    >>> fivetran_shift(s)
+    'kawhi_is_my_mvp'
     """
     # Replace international characters with similar ASCII characters
     name = name.strip()
@@ -98,8 +147,14 @@ def fivetran_shift(name):
 
 # TODO: Create the function that parses an xml or twb file and writes a new one that is connected to snowflake
 def modify_xml(workbook):
-    """Take a Tableau workbook that is connected to a Fivetran Table and Salesforce
-    and fixes the column names
+    """Take a Tableau workbook that is connected to Salesforce and change the connection to Snowflake by modifying the xml.
+    All salesforce links need to be replaced by either the federated connection or snowflake connection that was obtained from the 
+    "LogInToSnowflake.twb" file. All names referring to salesforce column names need to be replaced with the corresponding snowflake
+    names that follow the fivetran naming convention. All files in the "./Workbboks" folder will be ported and their new versions will 
+    be placed in "./Ported Workbooks" with "_tmp" at the end of the file name just before the file extension.
+
+    Parameters:
+    workbook - str: The name of the file to be ported.
     """
     # create a variable to hold the lines of the file
     statement = []
@@ -201,8 +256,14 @@ def modify_xml(workbook):
                 statement.append(line)
                 line = wkbk.readline()
 
+        
+
         # rewrite the tableau workbook with the lines in the statement list
         new_file = os.path.basename(workbook).split('.')
+
+        # go back to the main directory
+        os.chdir('../Ported Workbooks')
+
         new_file = new_file[0] + '_tmp.twb'
         with open(new_file, 'w') as f:
             for item in statement:
@@ -210,15 +271,18 @@ def modify_xml(workbook):
         
         # go back to the main directory
         os.chdir('../')
+       
 
 
 if __name__ == "__main__":
     new_workbook = './LogInToSnowflake.twb'
     federated_connection, snowflake_connection, new_caption, main_schema, connection = parse_freshbook(new_workbook)
-    # print(connection)
+
+    if not os.path.exists('./Ported Workbooks'):
+        os.mkdir('./Ported Workbooks')
 
     for wkbk in os.listdir('./Workbooks'):
-        if '.xml' in wkbk or '.twb'  in wkbk:
+        if wkbk[-4:] == '.xml' or wkbk[-4:] == '.twb' and wkbk[0] != '.':
             os.chdir('./Workbooks')
             print(wkbk)
             modify_xml(os.getcwd() + '/' + wkbk)
