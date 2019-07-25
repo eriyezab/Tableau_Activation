@@ -173,7 +173,6 @@ def modify_xml(workbook):
         old_federated = soup.find_all('datasource')[1]['name'].encode('ascii','ignore')
         old_snowflake = soup.find_all('datasource')[1].find('named-connection')['name'].encode('ascii','ignore')
     
-    print(old_caption, old_federated, old_snowflake)
     
     
     with open(workbook, 'r') as wkbk:
